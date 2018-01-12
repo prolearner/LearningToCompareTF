@@ -13,7 +13,7 @@ class MetaBatchBuilder():
         self.samples_per_class = samples_per_class  # k-shot
         self.samples_per_class_eval = query_per_cls  # for evaluation
 
-        print('MBB: %s (total sets:%d, n-way:%d, k-shot:%d, n_query_per_cls:%d)' % (
+        print('MBB: (total sets:%d, n-way:%d, k-shot:%d, n_query_per_cls:%d)' % (
             batch_size, classes_per_set, samples_per_class, self.samples_per_class_eval))
 
         self.support_set_batch = []  # input for support set
