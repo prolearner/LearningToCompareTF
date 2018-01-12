@@ -156,7 +156,7 @@ def main(_):
                                                                                          x2: inputs[1],
                                                                                          y: inputs[2]})
 
-                if i % 1000 == 0:
+                if i % 200 == 0:
 
                     accuracies = []
                     losses = []
@@ -231,14 +231,14 @@ if __name__ == '__main__':
     parser.add_argument(
         '--n_episodes_training',
         type=int,
-        default=1000,
+        default=400000,
         help='Number of episode for training'
     )
 
     parser.add_argument(
         '--n_episodes_test',
         type=int,
-        default=10,
+        default=1000,
         help='Number of episode for testing'
     )
 
