@@ -266,7 +266,7 @@ if __name__ == '__main__':
         '--batch_size',
         type=int,
         default=1,
-        help='Batch size.'
+        help='number of episodes in a mini batch'
     )
 
     parser.add_argument(
@@ -299,4 +299,3 @@ if __name__ == '__main__':
 
     FLAGS, unparsed = parser.parse_known_args()
     tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
-
