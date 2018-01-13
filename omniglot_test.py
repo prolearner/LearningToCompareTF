@@ -80,15 +80,15 @@ def main(_):
         h22 = convolutional_block(W2, b2, h12, training_ph, pool=True)
 
         W3, b3 = convolutional_params(n_channels)
-        h31 = convolutional_block(W3, b3, h21, training_ph)
-        h32 = convolutional_block(W3, b3, h22, training_ph)
+        h31 = convolutional_block(W3, b3, h21, training_ph, pool=True)  # in the paper pool = FALSE
+        h32 = convolutional_block(W3, b3, h22, training_ph, pool=True)  # in the paper pool = FALSE
 
         W4, b4 = convolutional_params(n_channels)
         h41 = convolutional_block(W4, b4, h31, training_ph)
         h42 = convolutional_block(W4, b4, h32, training_ph)
 
         # sum embeddings of the same class (useful when k-shot > 1)
-        h4_example_size = (example_size[0]//4, example_size[0]//4, n_channels)
+        h4_example_size = (4, 4, n_channels)
 
         h41_r = tf.reshape(h41, [batch_size, -1, c_way, k_shot, *h4_example_size])
         h41_r = tf.reduce_sum(h41_r, axis=3)

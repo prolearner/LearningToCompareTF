@@ -63,7 +63,7 @@ class Omniglot():
     processed_folder = 'processed'
 
     '''
-    The items inside self.train and self.test are dict of class_name: (filepath, class_index, rotation) elements
+    The items inside self.train and self.test are dict of class_name: [(file_path, class_index, rotation), ...] elements
     Args:
     - root: the directory where the dataset will be stored
     - download: need to download the dataset
