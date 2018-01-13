@@ -145,6 +145,8 @@ def main(_):
         omniglot_evaluation_dict = {'test_accuracy': [], 'train_accuracy': [], 'test_loss': [], 'train_loss': [],
                                     'step_time': [], 'flags': FLAGS}
 
+        result_path = get_result_filepath(FLAGS.results_filename, subfolder='omniglot')
+
         with tf.Session() as sess:
             sess.run(init_op)
             start_time = time.time()
@@ -187,8 +189,7 @@ def main(_):
                     omniglot_evaluation_dict['test_loss'].append((mean_loss, std_loss))
                     omniglot_evaluation_dict['step_time'].append((i, duration))
 
-                    res_path = get_result_filepath(FLAGS.results_filename, subfolder='omniglot')
-                    save_obj(res_path, omniglot_evaluation_dict)
+                    save_obj(result_path, omniglot_evaluation_dict)
 
 
 if __name__ == '__main__':
