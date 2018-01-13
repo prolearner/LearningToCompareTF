@@ -177,10 +177,13 @@ def main(_):
 
                     for j in range(n_test_episodes):
                         inputs = test_batch_iterator.get_inputs()
+                        '''
+                        training_ph should be False but has worse performance
+                        '''
                         loss_value, acc_value = sess.run([loss, accuracy], feed_dict={x1: inputs[0],
                                                                                       x2: inputs[1],
                                                                                       y: inputs[2],
-                                                                                      training_ph: False})
+                                                                                      training_ph: True})
                         accuracies.append(acc_value)
                         losses.append(loss_value)
 
