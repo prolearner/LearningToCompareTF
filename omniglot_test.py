@@ -3,7 +3,7 @@ import sys
 import time
 import tensorflow as tf
 import numpy as np
-from meta_batch_builder import MetaBatchBuilder
+from meta_batch_iterator import MetaBatchIterator
 import datasets
 
 from models import *
@@ -18,7 +18,6 @@ def convolutional_params(n_channels):
 
 
 def convolutional_block(W, b, x, pool=False):
-    # TODO: add batch normalization
 
     if pool:
         return max_pool_2x2(tf.nn.relu(tf.contrib.layers.batch_norm(conv2d(x, W) + b)))
@@ -33,8 +32,7 @@ FLAGS = None
 def main(_):
     print(FLAGS)
 
-    input_size = 28
-    n_channels = 1
+    example_size = (28, 28, 1)
 
     batch_size = FLAGS.batch_size
     lr_init = FLAGS.learning_rate
@@ -50,28 +48,26 @@ def main(_):
 
     rotations = list(range(FLAGS.n_rotations))
 
-    omniglot = datasets.Omniglot(root=FLAGS.omniglot_path, download=True,
-                                 rotations=rotations, split=FLAGS.n_train_classes)
 
-    train_batch_builder = MetaBatchBuilder(omniglot.train, batch_size, c_way, k_shot, n_query)
-    train_batch_builder.resize = input_size
+    omniglot = datasets.Omniglot(root=FLAGS.omniglot_path, download=True, rotations=rotations,
+                                 split=FLAGS.n_train_classes, example_size= example_size)
 
-    test_batch_builder = MetaBatchBuilder(omniglot.test, batch_size, c_way, k_shot, n_query_test)
-    test_batch_builder.resize = input_size
+    train_batch_iterator = MetaBatchIterator(omniglot.train, batch_size, c_way, k_shot, n_query)
+    test_batch_iterator = MetaBatchIterator(omniglot.test, batch_size, c_way, k_shot, n_query_test)
 
     with tf.Graph().as_default():
-        input_size = (train_batch_builder.resize, train_batch_builder.resize, n_channels)
 
-        x1, x2, y = train_batch_builder.get_placeholders(input_size)
+        x1, x2, y = train_batch_iterator.get_placeholders()
 
 
         # reshaping for training
-        x1_t = tf.reshape(x1, [-1, *input_size])
-        x2_t = tf.reshape(x2, [-1, *input_size])
+        x1_t = tf.reshape(x1, [-1, *example_size])
+        x2_t = tf.reshape(x2, [-1, *example_size])
         y_c = tf.reduce_mean(y, axis=3)
         y_t = tf.reshape(y_c, [-1, 1])
 
         # Embedding module
+        n_channels = example_size[-1]
 
         W1, b1 = convolutional_params(n_channels)
         h11 = convolutional_block(W1, b1, x1_t, pool=True)
@@ -91,33 +87,37 @@ def main(_):
         h41 = convolutional_block(W4, b4, h31)
         h42 = convolutional_block(W4, b4, h32)
 
-        # sum embeddings of the same class
-        h41_r = tf.reshape(h41, [batch_size, -1, c_way, k_shot, 7, 7, n_channels])
+        # sum embeddings of the same class (useful when k-shot > 1)
+        h4_example_size = (example_size[0]//4, example_size[0]//4, n_channels)
+
+        h41_r = tf.reshape(h41, [batch_size, -1, c_way, k_shot, *h4_example_size])
         h41_r = tf.reduce_sum(h41_r, axis=3)
-        h41_r = tf.reshape(h41_r, [-1, 7, 7, n_channels])
+        h41_r = tf.reshape(h41_r, [-1, *h4_example_size])
 
-        h42_r = tf.reshape(h42, [batch_size, -1, c_way, k_shot, 7, 7, n_channels])
+        h42_r = tf.reshape(h42, [batch_size, -1, c_way, k_shot, *h4_example_size])
         h42_r = tf.reduce_sum(h42_r, axis=3)
-        h42_r = tf.reshape(h42_r, [-1, 7, 7, n_channels])
+        h42_r = tf.reshape(h42_r, [-1, *h4_example_size])
 
-        h = tf.concat([h41_r, h42_r], axis=3)  # depth concatenation
-
+        # depth concatenation
+        h = tf.concat([h41_r, h42_r], axis=3)
         n_channels = n_channels*2
 
         # Relation Network
         W5, b5 = convolutional_params(n_channels)
         h5 = convolutional_block(W5, b5, h, pool=True)
 
-        n_channels = n_channels//2
+        n_channels = 64
 
         W6, b6 = convolutional_params(n_channels)
         h6 = convolutional_block(W6, b6, h5, pool=True)
 
-        fd = 4
+        # final dimension before fully connected layers (depends on the number and type of convolutions applied)
+        fd = 1
 
-        h6_flat = tf.reshape(h6, [-1, 64 * fd])
+        h6_example_size_flat = fd * fd * n_channels
+        h6_flat = tf.reshape(h6, [-1, h6_example_size_flat])
 
-        W_fc1 = weight_variable([fd * 64, 8])
+        W_fc1 = weight_variable([h6_example_size_flat, 8])
         b_fc1 = bias_variable([8])
         h_fc1 = tf.nn.relu(tf.nn.xw_plus_b(h6_flat, W_fc1, b_fc1))
 
@@ -147,6 +147,7 @@ def main(_):
         # The op for initializing the variables.
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
+        # Experiment dictionary that will be saved every test_interval steps
         omniglot_evaluation_dict = {'test_accuracy': [], 'train_accuracy': [], 'test_loss': [], 'train_loss': [],
                                     'step_time': [], 'flags': FLAGS}
 
@@ -158,7 +159,7 @@ def main(_):
 
             for i in range(n_train_steps):
 
-                inputs = train_batch_builder.get_inputs()
+                inputs = train_batch_iterator.get_inputs()
                 _, loss_value, acc_value = sess.run([train, loss, accuracy], feed_dict={x1: inputs[0],
                                                                                          x2: inputs[1],
                                                                                          y: inputs[2]})
@@ -174,7 +175,7 @@ def main(_):
                     omniglot_evaluation_dict['train_accuracy'].append(acc_value)
 
                     for j in range(n_test_episodes):
-                        inputs = test_batch_builder.get_inputs()
+                        inputs = test_batch_iterator.get_inputs()
                         loss_value, acc_value = sess.run([loss, accuracy], feed_dict={x1: inputs[0],
                                                                                       x2: inputs[1],
                                                                                       y: inputs[2]})

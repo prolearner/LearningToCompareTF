@@ -6,14 +6,16 @@ import numpy as np
 class Dataset():
     """
     Contains the dataset to be used in meta-learning
-    self._items contains tuples (filename,category, rotation).
+    self.items contains dictionaries of class_name: item_tuple elements
     self.idx_classes contains a dictionary of class_name: class_index elements
     """
-    def __init__(self, name,  items, idx_classes, parent):
-        self.parent = parent
+    def __init__(self, name,  items, idx_classes, get_data: callable, single_example_size):
         self.name = name
         self.items = items
         self.idx_classes = idx_classes
+
+        self.get_data = get_data
+        self.single_example_size = single_example_size
 
     def __getitem__(self, item):
         return self.items[item]
@@ -24,9 +26,6 @@ class Dataset():
     def classes(self):
         """returns a list containing all the classes names"""
         return list(self.idx_classes.keys())
-
-    def get_data(self, item):
-        return self.parent.get_data(item)
 
     @staticmethod
     def union(d1, d2, u_name):
@@ -64,7 +63,7 @@ class Omniglot():
     processed_folder = 'processed'
 
     '''
-    The items are (filename,category). The index of all the categories can be found in self.idx_classes
+    The items inside self.train and self.test are dict of class_name: (filepath, class_index, rotation) elements
     Args:
     - root: the directory where the dataset will be stored
     - download: need to download the dataset
@@ -72,8 +71,8 @@ class Omniglot():
     - split: value of training classes without considering rotations, if none folder splitting will be used
     '''
 
-    def __init__(self, root, download=False, rotations=None, split=None):
-        print('Loading Omniglot with rotations: {}, split: {}'.format(rotations, split))
+    def __init__(self, root, download=False, rotations=None, split=None, example_size=(105, 105, 1)):
+        print('Loading Omniglot with rotations: {}, split: {}, ex_size: {}'.format(rotations, split, example_size))
 
         self.root = root
 
@@ -91,8 +90,8 @@ class Omniglot():
         train_item, train_idx, test_item, test_idx = self.find_items_and_split(os.path.join(self.root,
                                                                                                 self.processed_folder))
 
-        self.train = Dataset('train', train_item, train_idx, self)
-        self.test = Dataset('test', test_item, test_idx, self)
+        self.train = Dataset('train', train_item, train_idx, self.get_data, example_size)
+        self.test = Dataset('test', test_item, test_idx, self.get_data, example_size)
 
     def download(self):
         """
@@ -178,6 +177,7 @@ class Omniglot():
 
     @staticmethod
     def get_data(item):
+        """read image from item path and applies rotation"""
         img = np.array(misc.imread(item[0]))
         img = np.rot90(img, int(item[2]))
         return img

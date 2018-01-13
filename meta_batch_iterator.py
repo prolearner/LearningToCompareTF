@@ -4,7 +4,7 @@ from skimage import transform
 import tensorflow as tf
 
 
-class MetaBatchBuilder():
+class MetaBatchIterator():
     def __init__(self, dataset, batch_size=100, classes_per_set=5, samples_per_class=1, query_per_cls=19):
         self.dataset = dataset
 
@@ -13,7 +13,7 @@ class MetaBatchBuilder():
         self.samples_per_class = samples_per_class  # k-shot
         self.samples_per_class_eval = query_per_cls  # for evaluation
 
-        print('MBB: (total sets:%d, n-way:%d, k-shot:%d, n_query_per_cls:%d)' % (
+        print('MBI: (total sets:%d, c-way:%d, k-shot:%d, n_query_per_cls:%d)' % (
             batch_size, classes_per_set, samples_per_class, self.samples_per_class_eval))
 
         self.support_set_batch = []  # input for support set
@@ -23,11 +23,11 @@ class MetaBatchBuilder():
         self.n_samples_eval = self.samples_per_class_eval * self.classes_per_set  # number of samples per set for evaluation
 
         # Transformations to the image
-        self.resize = 28
+        self.single_example_size = dataset.single_example_size
 
     def transform(self, img):
         img = img * (1. / 255) - 0.5
-        img = transform.resize(img, (self.resize, self.resize, 1))
+        img = transform.resize(img, self.single_example_size)
         return img
 
     def get_episode(self):
@@ -75,8 +75,8 @@ class MetaBatchBuilder():
         n_query = self.samples_per_class_eval*c_way
 
         y = np.zeros((self.batch_size, n_query, c_way, k_shot, 1))
-        x1 = np.zeros((self.batch_size, n_query, c_way,  k_shot, self.resize, self.resize, 1))
-        x2 = np.zeros((self.batch_size, n_query, c_way, k_shot, self.resize, self.resize, 1))
+        x1 = np.zeros((self.batch_size, n_query, c_way,  k_shot, *self.single_example_size))
+        x2 = np.zeros((self.batch_size, n_query, c_way, k_shot, *self.single_example_size))
 
         for b, (target_set, support_set) in enumerate(zip(target_sets, support_sets)):
             for t, t_item in enumerate(target_set):
@@ -89,14 +89,11 @@ class MetaBatchBuilder():
 
         return x1, x2, y
 
-    def get_placeholders(self, single_example_size):
-        c_way = self.classes_per_set
-        k_shot = self.samples_per_class
-        n_query = self.samples_per_class_eval*c_way
+    def get_placeholders(self):
 
         y_p = tf.placeholder(tf.float32, [None, None, None, None, 1])
-        x1_p = tf.placeholder(tf.float32, [None, None, None, None, *single_example_size])
-        x2_p = tf.placeholder(tf.float32, [None, None, None, None, *single_example_size])
+        x1_p = tf.placeholder(tf.float32, [None, None, None, None, *self.single_example_size])
+        x2_p = tf.placeholder(tf.float32, [None, None, None, None, *self.single_example_size])
 
         return x1_p, x2_p, y_p
 
@@ -106,13 +103,14 @@ if __name__ == '__main__':
 
     input_size = 28
 
-    omniglot = datasets.Omniglot(root='omniglot', download=True, rotations=[0, 1, 2, 3], split=1200)
-    train_batch_builder = MetaBatchBuilder(omniglot.train, batch_size=1)
-    train_batch_builder.resize = input_size
+    omniglot = datasets.Omniglot(root='omniglot', download=True, rotations=[0, 1, 2, 3],
+                                 split=1200, example_size=(input_size, input_size, 1))
+
+    train_batch_iterator = MetaBatchIterator(omniglot.train, batch_size=1)
 
     for j in range(100):
 
-        x1, x2, y = train_batch_builder.get_inputs()
+        x1, x2, y = train_batch_iterator.get_inputs()
         x1_f = np.reshape(x1, (-1, input_size, input_size, 1))
         x2_f = np.reshape(x2, (-1, input_size, input_size, 1))
         y_f = np.reshape(y, (-1, 1))
