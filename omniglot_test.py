@@ -17,12 +17,13 @@ def convolutional_params(n_channels):
     return W_conv, b_conv
 
 
-def convolutional_block(W, b, x, pool=False):
+def convolutional_block(W, b, x, training_ph, pool=False):
 
+    no_pooled_out = tf.nn.relu(tf.layers.batch_normalization(conv2d(x, W) + b, training=training_ph))
     if pool:
-        return max_pool_2x2(tf.nn.relu(tf.contrib.layers.batch_norm(conv2d(x, W) + b)))
+        return max_pool_2x2(no_pooled_out)
     else:
-        return tf.nn.relu(conv2d(x, W) + b)
+        return tf.nn.relu(no_pooled_out)
 
 
 # Basic model parameters as external flags.
@@ -48,7 +49,6 @@ def main(_):
 
     rotations = list(range(FLAGS.n_rotations))
 
-
     omniglot = datasets.Omniglot(root=FLAGS.omniglot_path, download=True, rotations=rotations,
                                  split=FLAGS.n_train_classes, example_size= example_size)
 
@@ -57,8 +57,8 @@ def main(_):
 
     with tf.Graph().as_default():
 
-        x1, x2, y = train_batch_iterator.get_placeholders()
-
+        x1, x2, y = train_batch_iterator.get_placeholders()  # shape = [batch_size, n_query*c_way, c_way, k_shot, ...]
+        training_ph = tf.placeholder(tf.bool)
 
         # reshaping for training
         x1_t = tf.reshape(x1, [-1, *example_size])
@@ -70,22 +70,22 @@ def main(_):
         n_channels = example_size[-1]
 
         W1, b1 = convolutional_params(n_channels)
-        h11 = convolutional_block(W1, b1, x1_t, pool=True)
-        h12 = convolutional_block(W1, b1, x2_t, pool=True)
+        h11 = convolutional_block(W1, b1, x1_t, training_ph, pool=True)
+        h12 = convolutional_block(W1, b1, x2_t, training_ph, pool=True)
 
         n_channels = 64
 
         W2, b2 = convolutional_params(n_channels)
-        h21 = convolutional_block(W2, b2, h11, pool=True)
-        h22 = convolutional_block(W2, b2, h12, pool=True)
+        h21 = convolutional_block(W2, b2, h11, training_ph, pool=True)
+        h22 = convolutional_block(W2, b2, h12, training_ph, pool=True)
 
         W3, b3 = convolutional_params(n_channels)
-        h31 = convolutional_block(W3, b3, h21)
-        h32 = convolutional_block(W3, b3, h22)
+        h31 = convolutional_block(W3, b3, h21, training_ph)
+        h32 = convolutional_block(W3, b3, h22, training_ph)
 
         W4, b4 = convolutional_params(n_channels)
-        h41 = convolutional_block(W4, b4, h31)
-        h42 = convolutional_block(W4, b4, h32)
+        h41 = convolutional_block(W4, b4, h31, training_ph)
+        h42 = convolutional_block(W4, b4, h32, training_ph)
 
         # sum embeddings of the same class (useful when k-shot > 1)
         h4_example_size = (example_size[0]//4, example_size[0]//4, n_channels)
@@ -104,12 +104,12 @@ def main(_):
 
         # Relation Network
         W5, b5 = convolutional_params(n_channels)
-        h5 = convolutional_block(W5, b5, h, pool=True)
+        h5 = convolutional_block(W5, b5, h, training_ph, pool=True)
 
         n_channels = 64
 
         W6, b6 = convolutional_params(n_channels)
-        h6 = convolutional_block(W6, b6, h5, pool=True)
+        h6 = convolutional_block(W6, b6, h5, training_ph, pool=True)
 
         # final dimension before fully connected layers (depends on the number and type of convolutions applied)
         fd = 1
@@ -162,7 +162,8 @@ def main(_):
                 inputs = train_batch_iterator.get_inputs()
                 _, loss_value, acc_value = sess.run([train, loss, accuracy], feed_dict={x1: inputs[0],
                                                                                          x2: inputs[1],
-                                                                                         y: inputs[2]})
+                                                                                         y: inputs[2],
+                                                                                        training_ph: True})
 
                 if i % test_interval == 0:
 
@@ -178,7 +179,8 @@ def main(_):
                         inputs = test_batch_iterator.get_inputs()
                         loss_value, acc_value = sess.run([loss, accuracy], feed_dict={x1: inputs[0],
                                                                                       x2: inputs[1],
-                                                                                      y: inputs[2]})
+                                                                                      y: inputs[2],
+                                                                                      training_ph: False})
                         accuracies.append(acc_value)
                         losses.append(loss_value)
 
