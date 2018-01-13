@@ -6,7 +6,7 @@ import numpy as np
 class Dataset():
     """
     Contains the dataset to be used in meta-learning
-    self.items contains dictionaries of class_name: item_tuple elements
+    self.items contains dictionaries of class_index: [item_tuple, item_tuple, ...] elements
     self.idx_classes contains a dictionary of class_name: class_index elements
     """
     def __init__(self, name,  items, idx_classes, get_data: callable, single_example_size):

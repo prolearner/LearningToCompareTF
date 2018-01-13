@@ -132,19 +132,18 @@ def main(_):
 
         # TEST tensors
         y_test = tf.reshape(y_c, [batch_size, -1, c_way])
-        y_idx = tf.argmax(y_test, axis=2)
+        y_correct_idx = tf.argmax(y_test, axis=2)
 
         output_test = tf.reshape(output, [batch_size, -1, c_way])
         max_idx = tf.argmax(output_test, axis=2)
 
-        correct_prediction = tf.equal(y_idx, max_idx)
+        correct_prediction = tf.equal(y_correct_idx, max_idx)
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='accuracy')
 
         # Optimizer
         opt = tf.train.AdamOptimizer(lr_init)
         train = opt.minimize(loss)
 
-        # The op for initializing the variables.
         init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
         # Experiment dictionary that will be saved every test_interval steps
