@@ -6,13 +6,14 @@ import numpy as np
 class Dataset():
     """
     Contains the dataset to be used in meta-learning
-    self.all_items contains tuples (filename,category). 
+    self._items contains tuples (filename,category, rotation).
     self.idx_classes contains a dictionary of class_name: class_index elements
     """
-    def __init__(self, name,  items_path, find_items, parent):
+    def __init__(self, name,  items, idx_classes, parent):
         self.parent = parent
         self.name = name
-        self.items, self.idx_classes = find_items(items_path)
+        self.items = items
+        self.idx_classes = idx_classes
 
     def __getitem__(self, item):
         return self.items[item]
@@ -24,9 +25,34 @@ class Dataset():
         """returns a list containing all the classes names"""
         return list(self.idx_classes.keys())
 
-    def get_data(self, image_path):
-        return self.parent.get_data(image_path)
+    def get_data(self, item):
+        return self.parent.get_data(item)
 
+    @staticmethod
+    def union(d1, d2, u_name):
+        if not isinstance(d1, Dataset) or not isinstance(d2, Dataset):
+            raise TypeError('d1 and d2 must be both Datasets')
+        if not d1.parent == d2.parent:
+            raise ValueError('d1 and d2 must have the same parent')
+
+        u_parent = d1.parent
+        u_items = d1.items.copy()
+        u_idx_classes = d1.idx_classes.copy()
+
+        for class_d2, items_d2 in d2.items.items():
+            if class_d2 not in u_idx_classes.keys():
+                u_idx_classes[class_d2] = len(u_idx_classes)
+                u_items[u_idx_classes[class_d2]] = items_d2
+            else:
+                for item in items_d2:
+                    if item not in u_items[u_idx_classes[class_d2]]:
+                        u_items[u_idx_classes[class_d2]].append(item)
+
+        u_dataset = Dataset(u_name, '', lambda x: x, u_parent )
+        u_dataset.items = u_items
+        u_dataset.idx_classes = u_idx_classes
+
+        return u_dataset
 
 
 class Omniglot():
@@ -41,12 +67,14 @@ class Omniglot():
     The items are (filename,category). The index of all the categories can be found in self.idx_classes
     Args:
     - root: the directory where the dataset will be stored
-    - transform: how to transform the input
-    - target_transform: how to transform the target
     - download: need to download the dataset
+    - rotations: array of rotation [0, 1, 2, 3] contains rotations of 0, 90, 180, 270 degrees
+    - split: value of training classes without considering rotations, if none folder splitting will be used
     '''
 
-    def __init__(self, root, download=False, rotations=False):
+    def __init__(self, root, download=False, rotations=None, split=None):
+        print('Loading Omniglot with rotations: {}, split: {}'.format(rotations, split))
+
         self.root = root
 
         if not self._check_exists():
@@ -55,8 +83,16 @@ class Omniglot():
             else:
                 raise RuntimeError('Dataset not found.' + ' You can use download=True to download it')
 
-        self.train = Dataset('train', os.path.join(self.root, self.processed_folder, 'images_background'), self.find_items, self)
-        self.test = Dataset('test', os.path.join(self.root, self.processed_folder, 'images_evaluation'), self.find_items, self)
+        self.split = split
+        self.rotations = rotations
+        if self.rotations is None:
+            self.rotations = [0]
+
+        train_item, train_idx, test_item, test_idx = self.find_items_and_split(os.path.join(self.root,
+                                                                                                self.processed_folder))
+
+        self.train = Dataset('train', train_item, train_idx, self)
+        self.test = Dataset('test', test_item, test_idx, self)
 
     def download(self):
         """
@@ -97,31 +133,54 @@ class Omniglot():
         return os.path.exists(os.path.join(self.root, self.processed_folder, "images_evaluation")) and \
                os.path.exists(os.path.join(self.root, self.processed_folder, "images_background"))
 
-    @staticmethod
-    def find_items(root_dir):
-        idx_classes = {}
-        items = {}
+    def find_items_and_split(self, root_dir):
+        train_items = {}
+        train_idx_classes = {}
+        test_items = {}
+        test_idx_classes = {}
 
+        idx_classes = train_idx_classes
+        items = train_items
+        cur_split = (self.split if self.split is not None else 964) * len(self.rotations)
         for (root, dirs, files) in os.walk(root_dir):
             for f in files:
                 if f.endswith("png"):
                     path_array = root.split('/')
                     class_name = path_array[-2] + "/" + path_array[-1]
-                    if class_name not in idx_classes.keys():
-                        idx_classes[class_name] = len(idx_classes)
-                        items[idx_classes[class_name]] = []
+                    if not self._check_class(class_name, idx_classes):
+                        if len(idx_classes) > cur_split - 1:
+                            idx_classes = test_idx_classes
+                            items = test_items
+                            cur_split = float('Inf')
+                        self._add_class(idx_classes, items, class_name)
 
-                    items[idx_classes[class_name]].append((os.path.join(root, f), idx_classes[class_name]))
+                    self._add_item(idx_classes, items, class_name, os.path.join(root, f))
 
-        print("== Found %d items in %d classes " % (len(items), len(idx_classes)))
-        return items, idx_classes
+        print("Classes Found: [%d, %d] ([train, test]) " % (len(train_idx_classes), len(test_idx_classes)))
+        return train_items, train_idx_classes, test_items, test_idx_classes
+
+    def _check_class(self, class_name, idx_classes):
+        r_class_name = class_name + str(self.rotations[0])
+        if r_class_name in idx_classes.keys():
+            return True
+        return False
+
+    def _add_class(self, idx_classes, items, class_name):
+        for r in self.rotations:
+            r_class_name = class_name + str(r)
+            idx_classes[r_class_name] = len(idx_classes)
+            items[idx_classes[r_class_name]] = []
+
+    def _add_item(self, idx_classes, items, class_name, item_path):
+        for r in self.rotations:
+            r_class_name = class_name + str(r)
+            items[idx_classes[r_class_name]].append((item_path, idx_classes[r_class_name], r))
 
     @staticmethod
-    def get_data(image_path):
-        img = np.array(misc.imread(image_path))
+    def get_data(item):
+        img = np.array(misc.imread(item[0]))
+        img = np.rot90(img, int(item[2]))
         return img
-
-
 
 
 if __name__ == '__main__':

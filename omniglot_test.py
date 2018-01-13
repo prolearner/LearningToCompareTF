@@ -46,8 +46,13 @@ def main(_):
 
     n_query_test = FLAGS.n_query_test
     n_test_episodes = FLAGS.n_episodes_test // batch_size
+    test_interval = FLAGS.test_interval
 
-    omniglot = datasets.Omniglot(root=FLAGS.omniglot_path, download=True)
+    rotations = list(range(FLAGS.n_rotations))
+
+    omniglot = datasets.Omniglot(root=FLAGS.omniglot_path, download=True,
+                                 rotations=rotations, split=FLAGS.n_train_classes)
+
     train_batch_builder = MetaBatchBuilder(omniglot.train, batch_size, c_way, k_shot, n_query)
     train_batch_builder.resize = input_size
 
@@ -158,7 +163,7 @@ def main(_):
                                                                                          x2: inputs[1],
                                                                                          y: inputs[2]})
 
-                if i % 200 == 0:
+                if i % test_interval == 0:
 
                     accuracies = []
                     losses = []
@@ -238,6 +243,13 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
+        '--test_interval',
+        type=int,
+        default=500,
+        help='number of steps before testing'
+    )
+
+    parser.add_argument(
         '--n_episodes_test',
         type=int,
         default=1000,
@@ -250,6 +262,21 @@ if __name__ == '__main__':
         default=1,
         help='Batch size.'
     )
+
+    parser.add_argument(
+        '--n_rotations',
+        type=int,
+        default=4,
+        help='number of rotations to consider to augment number of classes (min=1, max=4)'
+    )
+
+    parser.add_argument(
+        '--n_train_classes',
+        type=int,
+        default=1200,
+        help='number of classes for training (without considering rotations) (omniglot has 1623 classes)'
+    )
+
     parser.add_argument(
         '--omniglot_path',
         type=str,

@@ -84,8 +84,8 @@ class MetaBatchBuilder():
                     for s, s_item in enumerate(c_item):
                         if s_item[1] == t_item[1]:
                             y[b, t, c, s] = 1
-                        x1[b, t, c, s] = self.transform(self.dataset.get_data(t_item[0]))
-                        x2[b, t, c, s] = self.transform(self.dataset.get_data(s_item[0]))
+                        x1[b, t, c, s] = self.transform(self.dataset.get_data(t_item))
+                        x2[b, t, c, s] = self.transform(self.dataset.get_data(s_item))
 
         return x1, x2, y
 
@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     input_size = 28
 
-    omniglot = datasets.Omniglot(root='omniglot', download=True)
+    omniglot = datasets.Omniglot(root='omniglot', download=True, rotations=[0, 1, 2, 3], split=1200)
     train_batch_builder = MetaBatchBuilder(omniglot.train, batch_size=1)
     train_batch_builder.resize = input_size
 
@@ -122,8 +122,11 @@ if __name__ == '__main__':
             fig, ax = pyplot.subplots(1, 3, figsize=figsz, )
 
             ax[0].imshow(x1_f[i, :, :, 0], cmap='gray')
+            ax[0].set_xlabel('target image')
             ax[1].imshow(x2_f[i, :, :, 0], cmap='gray')
+            ax[1].set_xlabel('support image')
             ax[2].scatter(0, y_f[i], label='is_equal', )
+            ax[2].set_xlabel('same class')
             pyplot.show()
 
             # print("{}".format(j*x1.shape[0] + i))
