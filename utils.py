@@ -10,6 +10,7 @@ def save_obj(file_path, obj):
 def load_obj(file_path):
     with open(file_path, 'rb') as handle:
         b = pickle.load(handle)
+    return b
 
 
 def get_result_filepath(results_name, root='', subfolder=''):
