@@ -2,6 +2,8 @@ import numpy as np
 import datasets
 from skimage import transform
 import tensorflow as tf
+from queue import Queue
+from threading import Thread
 
 
 class MetaBatchIterator():
@@ -22,8 +24,20 @@ class MetaBatchIterator():
         self.n_samples = self.samples_per_class * self.classes_per_set  # num of samples per set
         self.n_samples_eval = self.samples_per_class_eval * self.classes_per_set  # number of samples per set for evaluation
 
-        # Transformations to the image
         self.single_example_size = dataset.single_example_size
+
+        self.inputs_queue = Queue(maxsize=100)
+        self._start_batch_makers(1)
+
+    def _start_batch_makers(self, number_of_workers):
+        for w in range(number_of_workers):
+            worker = Thread(target=self._inputs_producer)
+            worker.setDaemon(True)
+            worker.start()
+
+    def _inputs_producer(self):
+        while True:
+            self.inputs_queue.put(self.get_relation_inputs())
 
     def transform(self, img):
         img = img * (1. / 255) - 0.5
@@ -66,6 +80,9 @@ class MetaBatchIterator():
         return support_sets, target_sets
 
     def get_inputs(self):
+        return self.get_relation_inputs()
+
+    def get_relation_inputs(self):
         """retur"""
         support_sets, target_sets = self.get_batch()
 
