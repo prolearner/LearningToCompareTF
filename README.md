@@ -6,6 +6,9 @@ To start the omniglot training run
 omniglot_test.py
 ```
 
+omniglot dataset will be downloaded in the ```omniglot``` results while results will be stored in pickle files in the
+```results/omniglot/``` directory.
+
 check the bottom of the file to see and modify the arguments that you can pass
 
 ## Results
