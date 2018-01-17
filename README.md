@@ -9,5 +9,6 @@ omniglot_test.py
 check the bottom of the file to see and modify the arguments that you can pass
 
 ## Results
-![alt text](https://github.com/prolearner/LearningToCompareTF/blob/master/plots/omniglot_plots.png
-"Learning curve for a model similar to NaiveRN for the omniglot dataset augmented as in the paper")
+Learning curves for a model similar to NaiveRN for the omniglot dataset augmented as in the paper:
+
+![accuracy and loss on the test set over training episodes](https://github.com/prolearner/LearningToCompareTF/blob/master/plots/omniglot_plots.png)
