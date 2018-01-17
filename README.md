@@ -1,5 +1,5 @@
 # LearningToCompareTF
-implementation of the learning to compare article using tensorflow
+implementation of the  [learning to compare article](https://arxiv.org/abs/1711.06025) using tensorflow
 
 To start the omniglot training run
 ```
