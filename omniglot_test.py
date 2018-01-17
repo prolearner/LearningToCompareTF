@@ -66,7 +66,7 @@ def main(_):
         y_c = tf.reduce_mean(y, axis=3)
         y_t = tf.reshape(y_c, [-1, 1])
 
-        # Embedding module
+        # Embedding module (original has different paddings)
         n_channels = example_size[-1]
 
         W1, b1 = convolutional_params(n_channels)
@@ -102,7 +102,7 @@ def main(_):
         h = tf.concat([h41_r, h42_r], axis=3)
         n_channels = n_channels*2
 
-        # Relation Network
+        # Relation Network (original has different paddings)
         W5, b5 = convolutional_params(n_channels)
         h5 = convolutional_block(W5, b5, h, training_ph, pool=True)
 
