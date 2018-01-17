@@ -26,7 +26,7 @@ class MetaBatchIterator():
 
         self.single_example_size = dataset.single_example_size
 
-        self.inputs_queue = Queue(maxsize=100)
+        self.inputs_queue = Queue(maxsize=5)
         self._start_batch_makers(1)
 
     def _start_batch_makers(self, number_of_workers):
@@ -80,7 +80,7 @@ class MetaBatchIterator():
         return support_sets, target_sets
 
     def get_inputs(self):
-        return self.get_relation_inputs()
+        return self.inputs_queue.get()
 
     def get_relation_inputs(self):
         """retur"""
