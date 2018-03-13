@@ -6,7 +6,7 @@ from queue import Queue
 from threading import Thread
 
 
-class MetaBatchIterator():
+class MetaBatchIterator:
     def __init__(self, dataset, batch_size=100, classes_per_set=5, samples_per_class=1, query_per_cls=19):
         self.dataset = dataset
 
